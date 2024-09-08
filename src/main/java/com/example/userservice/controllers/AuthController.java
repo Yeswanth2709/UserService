@@ -1,6 +1,7 @@
 package com.example.userservice.controllers;
 
 import com.example.userservice.dtos.*;
+import com.example.userservice.exceptions.AuthenticationFailedException;
 import com.example.userservice.models.User;
 import com.example.userservice.services.IAuthService;
 import org.antlr.v4.runtime.misc.Pair;
@@ -31,7 +32,7 @@ public class AuthController {
     public ResponseEntity<UserDto> login(@RequestBody LoginRequestDto loginRequestDto){
         try {
             Pair<User, MultiValueMap<String, String>> loginUser = authService.login(loginRequestDto.getEmail(), loginRequestDto.getPassword());
-            if (loginUser.a == null) {
+            if (loginUser == null) {
                 throw new IllegalArgumentException("Invalid email or password");
             }
             return new ResponseEntity<>(from(loginUser.a),loginUser.b, HttpStatus.OK);
@@ -52,7 +53,16 @@ public class AuthController {
     }
 
     @PostMapping("/validateToken")
-    public void validateToken(@RequestBody ValidateTokenRequestDto validateTokenRequestDto){
+    public ResponseEntity<String> validateToken(@RequestBody ValidateTokenRequestDto validateTokenRequestDto) throws AuthenticationFailedException {
+        try {
+            Boolean result = authService.validateToken(validateTokenRequestDto.getToken(), validateTokenRequestDto.getUserId());
+            if (!result) {
+                throw new AuthenticationFailedException("Bad credentials");
+            }
+            return new ResponseEntity<>("valid token",HttpStatus.OK);
+        }catch (AuthenticationFailedException ex){
+            throw ex;
+        }
 
     }
 
