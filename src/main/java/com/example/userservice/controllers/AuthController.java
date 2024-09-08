@@ -3,8 +3,10 @@ package com.example.userservice.controllers;
 import com.example.userservice.dtos.*;
 import com.example.userservice.models.User;
 import com.example.userservice.services.IAuthService;
+import org.antlr.v4.runtime.misc.Pair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,11 +30,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<UserDto> login(@RequestBody LoginRequestDto loginRequestDto){
         try {
-            User user = authService.login(loginRequestDto.getEmail(), loginRequestDto.getPassword());
-            if (user == null) {
+            Pair<User, MultiValueMap<String, String>> loginUser = authService.login(loginRequestDto.getEmail(), loginRequestDto.getPassword());
+            if (loginUser.a == null) {
                 throw new IllegalArgumentException("Invalid email or password");
             }
-            return new ResponseEntity<>(from(user), HttpStatus.OK);
+            return new ResponseEntity<>(from(loginUser.a),loginUser.b, HttpStatus.OK);
         }
         catch(IllegalArgumentException ex){
             throw ex;

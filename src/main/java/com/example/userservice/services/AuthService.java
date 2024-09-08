@@ -1,10 +1,22 @@
 package com.example.userservice.services;
 
+import com.example.userservice.models.Session;
+import com.example.userservice.models.SessionStatus;
 import com.example.userservice.models.User;
+import com.example.userservice.repositories.SessionRepository;
 import com.example.userservice.repositories.UserRepository;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.MacAlgorithm;
+import org.antlr.v4.runtime.misc.Pair;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
+import javax.crypto.SecretKey;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -13,10 +25,11 @@ public class AuthService implements IAuthService {
 
     private BCryptPasswordEncoder bCryptPasswordEncoder;
 
-
-    public AuthService(UserRepository userRepository, BCryptPasswordEncoder bCryptPasswordEncoder) {
+    private SessionRepository sessionRepository;
+    public AuthService(UserRepository userRepository, BCryptPasswordEncoder bCryptPasswordEncoder,SessionRepository sessionRepository) {
         this.userRepository = userRepository;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
+        this.sessionRepository = sessionRepository;
     }
 
     @Override
@@ -31,7 +44,7 @@ public class AuthService implements IAuthService {
         return userRepository.save(user);
     }
     @Override
-    public User login(String email, String password){
+    public Pair<User, MultiValueMap<String,String>> login(String email, String password){
         Optional<User> optionalUser = userRepository.findByEmail(email);
         if(optionalUser.isEmpty()){
             return null;
@@ -41,8 +54,26 @@ public class AuthService implements IAuthService {
         if(!bCryptPasswordEncoder.matches(password,user.getPassword())){
             return null;
         }
+        //generating token
+        Map<String,Object> jwtData = new HashMap<>();
+        jwtData.put("email",user.getEmail());
+        jwtData.put("roles",user.getRoles());
+        Long nowInMillis = System.currentTimeMillis();
+        jwtData.put("iat",nowInMillis);
+        jwtData.put("exp",nowInMillis+24*60*60*1000);
 
-        return user;
+        MacAlgorithm algorithm= Jwts.SIG.HS256;
+        SecretKey secretKey=algorithm.key().build();
+        String token=Jwts.builder().claims(jwtData).signWith(secretKey).compact();
+
+        Session session=new Session();
+        session.setUser(user);
+        session.setToken(token);
+        session.setSessionStatus(SessionStatus.ACTIVE);
+        sessionRepository.save(session);
+        MultiValueMap<String,String> headers=new LinkedMultiValueMap<>();
+        headers.add(HttpHeaders.SET_COOKIE,token);
+        return new Pair<>(user,headers);
     }
 
 }
